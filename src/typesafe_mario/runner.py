@@ -12,6 +12,8 @@ from .dashboard import DashboardCommand, LiveDashboard
 from .policy import Decision, Policy
 from .state import MarioStateParser
 
+NES_FRAME_SECONDS = 1 / 60
+
 
 def _unwrap_ram(env: Any) -> Any:
     current = env
@@ -281,8 +283,14 @@ def run_episode(
                     step_index = (
                         release_index if offset == 0 and release_index is not None else action_index
                     )
+                    frame_started = time.perf_counter()
                     frame, reward, terminated, truncated, info = env.step(step_index)
                     total_reward += float(reward)
+                    if display == "game":
+                        env.render()
+                        time.sleep(
+                            max(0.0, NES_FRAME_SECONDS - (time.perf_counter() - frame_started))
+                        )
                     if terminated or truncated:
                         break
 
