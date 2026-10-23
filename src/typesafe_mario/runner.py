@@ -11,6 +11,7 @@ from .actions import ACTION_TO_INDEX, JUMP_ACTIONS, JUMP_RELEASE_ACTION, Action
 from .dashboard import DashboardCommand, LiveDashboard
 from .policy import Decision, Policy
 from .state import MarioStateParser
+from .viewer import GameViewer
 
 NES_FRAME_SECONDS = 1 / 60
 
@@ -226,9 +227,10 @@ def run_episode(
 
     if display not in {"dashboard", "game", "none"}:
         raise ValueError("display must be dashboard, game, or none")
-    render_mode = "human" if display == "game" else "rgb_array"
+    render_mode = "rgb_array"
     env = create_mario_env(env_id, render_mode=render_mode)
     dashboard = LiveDashboard() if display == "dashboard" else None
+    game_view = GameViewer() if display == "game" else None
     parser = MarioStateParser(decision_horizon_frames=frames_per_decision)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -286,8 +288,8 @@ def run_episode(
                     frame_started = time.perf_counter()
                     frame, reward, terminated, truncated, info = env.step(step_index)
                     total_reward += float(reward)
-                    if display == "game":
-                        env.render()
+                    if game_view:
+                        game_view.show(frame)
                         time.sleep(
                             max(0.0, NES_FRAME_SECONDS - (time.perf_counter() - frame_started))
                         )
@@ -320,6 +322,8 @@ def run_episode(
     finally:
         if dashboard:
             dashboard.close()
+        if game_view:
+            game_view.close()
         env.close()
         close = getattr(policy, "close", None)
         if callable(close):
