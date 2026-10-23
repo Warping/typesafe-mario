@@ -1,6 +1,6 @@
 """Keyboard policy for recording human demonstrations on Windows.
 
-Keys: Right/Left arrows move, Z is A (jump), X is B (run). The keys held at each
+Keys: A moves left, D moves right, Space jumps, Left Shift runs. The keys held at each
 decision boundary become that decision's action, so human play is logged in the
 same format as every other policy.
 """
@@ -15,12 +15,13 @@ from .actions import Action
 from .policy import Decision
 from .state import MarioSnapshot
 
-VK_LEFT = 0x25
-VK_RIGHT = 0x27
-VK_Z = 0x5A
-VK_X = 0x58
+VK_A = 0x41
+VK_D = 0x44
+VK_SPACE = 0x20
+VK_LSHIFT = 0xA0
 
-KEY_NAMES: Mapping[str, int] = {"left": VK_LEFT, "right": VK_RIGHT, "a": VK_Z, "b": VK_X}
+# Logical NES buttons ("a" = jump, "b" = run) mapped to physical keys.
+KEY_NAMES: Mapping[str, int] = {"left": VK_A, "right": VK_D, "a": VK_SPACE, "b": VK_LSHIFT}
 
 
 def held_action(keys: frozenset[str]) -> Action:
