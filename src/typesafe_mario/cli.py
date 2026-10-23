@@ -9,7 +9,7 @@ from .benchmark import format_summary, summarize_run
 from .dataset import finetune_laya, rows_from_logs, write_dataset
 from .human import HumanPolicy
 from .policy import HeuristicPolicy, LayaPolicy
-from .runner import run_episode
+from .runner import replay_run, run_episode
 from .state import MarioStateParser
 from .teacher import RuleTeacherPolicy
 
@@ -116,6 +116,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="teacher",
         help="teacher: rule labels. logged: the action recorded in each log (use for human runs)",
     )
+    replay = subparsers.add_parser("replay", help="Watch a saved run log in the game window")
+    replay.add_argument("log", type=Path, help="JSONL run log to replay")
+    replay.add_argument("--env", default="SuperMarioBros-1-1-v0")
+    replay.add_argument("--seed", type=int, default=123, help="Seed the run was recorded with")
+    replay.add_argument("--frames-per-decision", type=int, default=8)
     tune = subparsers.add_parser("finetune", help="Fine-tune Laya on a teacher-labelled dataset")
     tune.add_argument("--data", type=Path, required=True)
     tune.add_argument("--out", type=Path, default=Path("models\\mario-laya"))
@@ -161,6 +166,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             log_every=args.log_every,
         )
         print(f"Fine-tuned checkpoint: {args.out.resolve()}")
+        return 0
+    if args.command == "replay":
+        replay_run(
+            args.log,
+            env_id=args.env,
+            seed=args.seed,
+            frames_per_decision=args.frames_per_decision,
+        )
         return 0
     if args.command == "play":
         if args.policy == "laya":

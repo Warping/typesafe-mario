@@ -329,4 +329,52 @@ def run_episode(
         if callable(close):
             close()
 
+    if display == "game":
+        print("Replaying run...", flush=True)
+        replay_run(log_path, env_id=env_id, seed=seed, frames_per_decision=frames_per_decision)
     return log_path
+
+
+def replay_run(log_path: Path, env_id: str, seed: int, frames_per_decision: int) -> None:
+    """Re-run a logged episode action by action, showing each frame in the game window.
+
+    The game is deterministic for a given seed, so replaying the logged actions reproduces the run.
+    """
+    records = [
+        json.loads(line)
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    env = create_mario_env(env_id, render_mode="rgb_array")
+    view = GameViewer(title=f"replay {log_path.name}")
+    try:
+        frame, _ = env.reset(seed=seed)
+        view.show(frame)
+        for record in records:
+            action = Action(record["action"])
+            player = record["state"]["player"]
+            release_index = None
+            if action in JUMP_ACTIONS and player["grounded"]:
+                release_index = ACTION_TO_INDEX[JUMP_RELEASE_ACTION[action]]
+            terminated = truncated = False
+            for offset in range(frames_per_decision):
+                step_index = (
+                    release_index
+                    if offset == 0 and release_index is not None
+                    else ACTION_TO_INDEX[action]
+                )
+                frame_started = time.perf_counter()
+                frame, _, terminated, truncated, _ = env.step(step_index)
+                view.show(frame)
+                time.sleep(max(0.0, NES_FRAME_SECONDS - (time.perf_counter() - frame_started)))
+                if terminated or truncated:
+                    break
+            print(
+                f"#{record['decision']:04d} x={player['x']:04d} action={action.value}",
+                flush=True,
+            )
+            if terminated or truncated:
+                break
+    finally:
+        view.close()
+        env.close()
