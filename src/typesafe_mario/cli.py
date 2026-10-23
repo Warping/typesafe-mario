@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .benchmark import format_summary, summarize_run
 from .dataset import finetune_laya, rows_from_logs, write_dataset
+from .human import HumanPolicy
 from .policy import HeuristicPolicy, LayaPolicy
 from .runner import run_episode
 from .state import MarioStateParser
@@ -72,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     play.add_argument("--max-decisions", type=int, default=2000)
     play.add_argument("--seed", type=int, default=123)
-    play.add_argument("--policy", choices=("laya", "heuristic", "teacher"), default="laya")
+    play.add_argument("--policy", choices=("laya", "heuristic", "teacher", "human"), default="laya")
     play.add_argument(
         "--teacher-epsilon",
         type=float,
@@ -109,6 +110,12 @@ def build_parser() -> argparse.ArgumentParser:
     make_dataset.add_argument("logs", nargs="+", type=Path)
     make_dataset.add_argument("--out", type=Path, default=Path("data\\mario-decisions.jsonl"))
     make_dataset.add_argument("--frames-per-decision", type=int, default=8)
+    make_dataset.add_argument(
+        "--labels",
+        choices=("teacher", "logged"),
+        default="teacher",
+        help="teacher: rule labels. logged: the action recorded in each log (use for human runs)",
+    )
     tune = subparsers.add_parser("finetune", help="Fine-tune Laya on a teacher-labelled dataset")
     tune.add_argument("--data", type=Path, required=True)
     tune.add_argument("--out", type=Path, default=Path("models\\mario-laya"))
@@ -137,7 +144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "make-dataset":
         count = write_dataset(
-            rows_from_logs(args.logs, args.frames_per_decision), args.out
+            rows_from_logs(args.logs, args.frames_per_decision, labels=args.labels), args.out
         )
         print(f"Wrote {count} rows to {args.out.resolve()}")
         return 0
@@ -164,6 +171,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         elif args.policy == "teacher":
             policy = RuleTeacherPolicy(epsilon=args.teacher_epsilon, seed=args.seed)
+        elif args.policy == "human":
+            policy = HumanPolicy()
         else:
             policy = HeuristicPolicy()
         log_path = run_episode(

@@ -278,7 +278,9 @@ def run_episode(
                 total_reward = 0.0
                 terminated = truncated = False
                 for offset in range(frames_per_decision):
-                    step_index = release_index if offset == 0 and release_index is not None else action_index
+                    step_index = (
+                        release_index if offset == 0 and release_index is not None else action_index
+                    )
                     frame, reward, terminated, truncated, info = env.step(step_index)
                     total_reward += float(reward)
                     if terminated or truncated:

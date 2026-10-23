@@ -8,19 +8,29 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .actions import Action
+from .actions import JUMP_ACTIONS, Action
 from .policy import build_questions
 from .teacher import teacher_answers
 
 
-def rows_from_logs(paths: Iterable[Path], frames_per_decision: int = 8) -> Iterator[dict[str, Any]]:
+def rows_from_logs(
+    paths: Iterable[Path], frames_per_decision: int = 8, labels: str = "teacher"
+) -> Iterator[dict[str, Any]]:
+    """Yield Laya rows. labels='teacher' re-derives answers from rules; 'logged' uses the recorded action."""
+    if labels not in ("teacher", "logged"):
+        raise ValueError(f"labels must be 'teacher' or 'logged', not {labels!r}")
     questions = build_questions(tuple(Action), frames_per_decision)
     for path in paths:
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            state = json.loads(line)["state"]
+            record = json.loads(line)
+            state = record["state"]
             answers = teacher_answers(state)
+            if labels == "logged":
+                action = Action(record["action"])
+                answers["next_action"] = action
+                answers["jump_needed"] = action in JUMP_ACTIONS
             yield {
                 "state": state,
                 "questions": questions,
@@ -65,6 +75,9 @@ def finetune_laya(
         gradient_checkpointing=True,
         log_every=log_every,
     )
-    print(f"[{datetime.now():%H:%M:%S}] starting fine-tune: base={base} data={data} out={output_dir}", flush=True)
+    print(
+        f"[{datetime.now():%H:%M:%S}] starting fine-tune: base={base} data={data} out={output_dir}",
+        flush=True,
+    )
     finetune(str(data), model_dir, str(output_dir), config=config, device=device)
     print(f"[{datetime.now():%H:%M:%S}] fine-tune finished", flush=True)
