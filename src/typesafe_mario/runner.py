@@ -306,13 +306,14 @@ def run_episode(
                     truncated=truncated,
                 )
                 best_x = max(best_x, snapshot.x)
-                print(
-                    f"#{decision_index:04d} t={time.perf_counter() - started:7.1f}s "
-                    f"x={snapshot.x:04d} best={best_x:04d} "
-                    f"action={decision.action.value:<15} "
-                    f"confidence={decision.confidence:.2f} latency={decision.latency_ms:.0f}ms",
-                    flush=True,
-                )
+                if display != "game":
+                    print(
+                        f"#{decision_index:04d} t={time.perf_counter() - started:7.1f}s "
+                        f"x={snapshot.x:04d} best={best_x:04d} "
+                        f"action={decision.action.value:<15} "
+                        f"confidence={decision.confidence:.2f} latency={decision.latency_ms:.0f}ms",
+                        flush=True,
+                    )
 
                 previous_action = decision.action
                 previous_reward = total_reward
