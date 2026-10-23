@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from .actions import ACTION_DESCRIPTIONS, Action
@@ -110,6 +111,9 @@ class LayaPolicy:
         except ImportError as exc:
             raise RuntimeError("laya is not installed. Run `uv sync` in this project.") from exc
         self._router = Router(device=device)
+        if Path(model).is_dir():
+            # Local fine-tuned checkpoints must be registered before the router can serve them.
+            model = self._router.register("local-finetune", str(Path(model).resolve()))
         self._model = model
         self._frames_per_decision = frames_per_decision
 
