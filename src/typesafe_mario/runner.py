@@ -13,7 +13,23 @@ from .policy import Decision, Policy
 from .state import MarioStateParser
 from .viewer import GameViewer
 
-NES_FRAME_SECONDS = 1 / 60
+NES_FRAME_SECONDS = 1 / 60.0988
+
+
+class FramePacer:
+    """Holds frames to the NES rate on a fixed schedule so sleep overshoot does not accumulate."""
+
+    def __init__(self) -> None:
+        self._next = time.perf_counter()
+
+    def wait(self) -> None:
+        self._next += NES_FRAME_SECONDS
+        delay = self._next - time.perf_counter()
+        if delay > 0:
+            time.sleep(delay)
+        else:
+            # Fell behind (slow draw); resync instead of running fast to catch up.
+            self._next = time.perf_counter()
 
 
 def _unwrap_ram(env: Any) -> Any:
@@ -231,6 +247,7 @@ def run_episode(
     env = create_mario_env(env_id, render_mode=render_mode)
     dashboard = LiveDashboard() if display == "dashboard" else None
     game_view = GameViewer() if display == "game" else None
+    pacer = FramePacer()
     parser = MarioStateParser(decision_horizon_frames=frames_per_decision)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -285,14 +302,11 @@ def run_episode(
                     step_index = (
                         release_index if offset == 0 and release_index is not None else action_index
                     )
-                    frame_started = time.perf_counter()
                     frame, reward, terminated, truncated, info = env.step(step_index)
                     total_reward += float(reward)
                     if game_view:
                         game_view.show(frame)
-                        time.sleep(
-                            max(0.0, NES_FRAME_SECONDS - (time.perf_counter() - frame_started))
-                        )
+                        pacer.wait()
                     if terminated or truncated:
                         break
 
@@ -348,6 +362,7 @@ def replay_run(log_path: Path, env_id: str, seed: int, frames_per_decision: int)
     ]
     env = create_mario_env(env_id, render_mode="rgb_array")
     view = GameViewer(title=f"replay {log_path.name}")
+    pacer = FramePacer()
     try:
         frame, _ = env.reset(seed=seed)
         view.show(frame)
@@ -364,10 +379,9 @@ def replay_run(log_path: Path, env_id: str, seed: int, frames_per_decision: int)
                     if offset == 0 and release_index is not None
                     else ACTION_TO_INDEX[action]
                 )
-                frame_started = time.perf_counter()
                 frame, _, terminated, truncated, _ = env.step(step_index)
                 view.show(frame)
-                time.sleep(max(0.0, NES_FRAME_SECONDS - (time.perf_counter() - frame_started)))
+                pacer.wait()
                 if terminated or truncated:
                     break
             if terminated or truncated:
