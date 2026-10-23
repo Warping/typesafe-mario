@@ -370,10 +370,6 @@ def replay_run(log_path: Path, env_id: str, seed: int, frames_per_decision: int)
                 time.sleep(max(0.0, NES_FRAME_SECONDS - (time.perf_counter() - frame_started)))
                 if terminated or truncated:
                     break
-            print(
-                f"#{record['decision']:04d} x={player['x']:04d} action={action.value}",
-                flush=True,
-            )
             if terminated or truncated:
                 break
     finally:
