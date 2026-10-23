@@ -1,4 +1,4 @@
-"""TypeSafe-powered direct controller for Super Mario Bros."""
+"""Laya-powered direct controller for Super Mario Bros."""
 
 from .actions import Action
 from .state import MarioSnapshot, MarioStateParser

@@ -47,7 +47,7 @@ def clamp01(value: float | None) -> float:
 
 
 class LiveDashboard:
-    """One-window game feed and TypeSafe telemetry display."""
+    """One-window game feed and Laya telemetry display."""
 
     def __init__(
         self,
@@ -65,7 +65,7 @@ class LiveDashboard:
         self.config = config or DashboardConfig()
         self.theme = theme or DashboardTheme()
         pygame.init()
-        pygame.display.set_caption("TypeSafe plays Super Mario Bros.")
+        pygame.display.set_caption("Laya plays Super Mario Bros.")
         self.screen = pygame.display.set_mode((self.config.width, self.config.height))
         self.clock = pygame.time.Clock()
         self.font_title = pygame.font.SysFont("Segoe UI Semibold", 25)
@@ -190,11 +190,11 @@ class LiveDashboard:
         game_w = panel_x - margin * 2
         game_h = c.height - game_y - margin
 
-        self._text("TypeSafe plays Mario", self.font_title, t.text, margin, 18)
+        self._text("Laya plays Mario", self.font_title, t.text, margin, 18)
         if run_ended:
             status = "Run ended"
         else:
-            status = "Waiting for Jev" if waiting else "Live decision loop"
+            status = "Waiting for Laya" if waiting else "Live decision loop"
         status_width = self.font_small.size(status)[0]
         dot_x = panel_x - status_width - 24
         status_color = t.danger if run_ended else (t.warning if waiting else t.accent)
@@ -229,7 +229,7 @@ class LiveDashboard:
         self._text(action_name, self.font_action, t.text, x, y)
         y += 42
         if decision is None:
-            description = "Jev is evaluating the next bounded controller action."
+            description = "Laya is evaluating the next bounded controller action."
         else:
             description = ACTION_DESCRIPTIONS[decision.action]
         self._text(description, self.font_small, t.muted, x, y)

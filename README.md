@@ -1,19 +1,19 @@
-# TypeSafe Mario
+# Laya Mario
 
-An experimental controller that lets TypeSafe's Jev model directly choose NES
-controller inputs for the original Super Mario Bros.
+An experimental controller that lets a local [Laya](https://github.com/NandhaKishorM/laya)
+model directly choose NES controller inputs for the original Super Mario Bros.
 
 The model does **not** receive screenshots. The harness translates emulator telemetry
 and RAM into compact, object-centric JSON containing Mario's motion, jump trajectory,
 upcoming enemies, terrain, measured response delay, recent-control results, and episode
-progress. Jev chooses one of the legal controller actions, the emulator advances several
+progress. Laya chooses one of the legal controller actions, the emulator advances several
 frames, and the loop repeats. The raw local tile grid remains available in debug logs
 and the UI, but is not duplicated in the model input.
 
 ## Architecture
 
 ```text
-NES emulator -> telemetry/RAM parser -> structured JSON -> Jev Choice -> controller input
+NES emulator -> telemetry/RAM parser -> structured JSON -> Laya Choice -> controller input
 ```
 
 The initial action set is intentionally small:
@@ -28,9 +28,10 @@ The initial action set is intentionally small:
 
 ## Requirements
 
-- Python 3.13 or newer
-- A TypeSafe API key in `TYPESAFE_API_KEY`
+- Python 3.13 or newer (the project requirement; Laya itself needs 3.10+)
 - A legal local setup for Super Mario Bros.
+- Internet access on first run, to download the Laya checkpoint from Hugging Face
+  (about 420 MB, cached afterwards). No API key is needed.
 
 This repository contains no Nintendo ROM or other copyrighted game data. You are
 responsible for ensuring that your emulator and game files are obtained and used
@@ -39,27 +40,27 @@ lawfully.
 ## Setup
 
 ```powershell
-py -3.13 -m venv .venv
-.venv\Scripts\python -m pip install -e ".[mario,dev]"
-$env:TYPESAFE_API_KEY = "your-key"
+uv sync --extra mario --extra dev
 ```
 
-Inspect the exact JSON and text that will be sent to TypeSafe without launching the
-game or calling the API:
+Inspect the exact JSON and text that will be sent to the model without launching the
+game or running the model:
 
 ```powershell
 .venv\Scripts\typesafe-mario state-demo
 ```
 
-Run World 1-1 with Jev making a decision every eight emulator steps. The default
+Run World 1-1 with Laya making a decision every eight emulator steps. The default
 display is a single recordable window with the live game and model telemetry:
 
 ```powershell
 .venv\Scripts\typesafe-mario play --env SuperMarioBros-1-1-v0 --frames-per-decision 8
 ```
 
+Use `--policy heuristic` to run the offline baseline without loading a model.
+
 The dashboard shows the selected action, full Choice probability distribution,
-confidence, Jev latency, jump probability, danger score, reward, and parsed game
+confidence, Laya latency, jump probability, danger score, reward, and parsed game
 state. Press `R` or click **Restart** for a fresh episode; the dashboard remains open
 after death or level completion. Press `Esc` or `Q` to quit. Use `--display game` for
 only the emulator window or `--display none` for a headless benchmark.
@@ -70,7 +71,7 @@ game outcome, providing the data for a live overlay or rendered social clip.
 
 ## What the parser produces
 
-TypeSafe accepts JSON directly, so there is no need to flatten telemetry into prose.
+Laya takes the state as a JSON object, so there is no need to flatten telemetry into prose.
 The model-facing object groups observations by meaning:
 
 - `player`: position, velocity, grounded state, jump phase, and power-up
@@ -98,18 +99,23 @@ Local grid (# solid, . empty, E enemy, M Mario):
 
 The structured object is canonical; the text view is only for debugging and UI.
 
-## TypeSafe judgments
+## Laya judgments
 
-Each request evaluates three independent judgments over the same state:
+Each decision asks three independent questions over the same state, using
+`laya-typed-decisions` (1024-token context):
 
-- a `Choice` selects the next controller macro;
-- a `Noul` estimates whether a forward jump is useful now;
-- a `Score` measures immediate danger for the live visualization.
+- a `choice` selects the next controller macro;
+- a `noul` estimates whether a forward jump is useful now;
+- a `score` measures immediate danger for the live visualization.
 
 Exact timing arithmetic stays in code. For example, the parser combines measured
 response age, enemy motion, action cadence, and jump-clearance time into a typed
-`jump_must_start_this_decision` fact. Jev interprets those facts and still owns the
+`jump_must_start_this_decision` fact. Laya interprets those facts and still owns the
 controller choice—there is no scripted recovery-action override.
+
+The policy lives in [policy.py](src/typesafe_mario/policy.py) as `LayaPolicy`.
+`Router.predict` runs locally, so each decision costs a forward pass over the
+checkpoint on your machine rather than a network call.
 
 ## Development
 

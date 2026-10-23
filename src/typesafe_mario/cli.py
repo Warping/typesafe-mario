@@ -5,9 +5,12 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from .policy import HeuristicPolicy, TypeSafePolicy
+from .benchmark import format_summary, summarize_run
+from .dataset import finetune_laya, rows_from_logs, write_dataset
+from .policy import HeuristicPolicy, LayaPolicy
 from .runner import run_episode
 from .state import MarioStateParser
+from .teacher import RuleTeacherPolicy
 
 
 def _demo_ram() -> bytearray:
@@ -69,7 +72,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     play.add_argument("--max-decisions", type=int, default=2000)
     play.add_argument("--seed", type=int, default=123)
-    play.add_argument("--policy", choices=("typesafe", "heuristic"), default="typesafe")
+    play.add_argument("--policy", choices=("laya", "heuristic", "teacher"), default="laya")
+    play.add_argument(
+        "--teacher-epsilon",
+        type=float,
+        default=0.0,
+        help="Teacher policy only: chance per decision of a random action, for data variety",
+    )
+    play.add_argument(
+        "--model",
+        default="laya-typed-decisions",
+        help="Laya checkpoint: laya-typed-decisions, english, or multilingual",
+    )
+    play.add_argument(
+        "--device",
+        default="auto",
+        help="Laya device: auto (CUDA if available), cuda, cuda:0, or cpu",
+    )
     play.add_argument(
         "--display",
         choices=("dashboard", "game", "none"),
@@ -82,6 +101,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Save the first populated dashboard frame as a PNG",
     )
+    summarize = subparsers.add_parser("summarize", help="Print benchmark stats for run logs")
+    summarize.add_argument("logs", nargs="+", type=Path, help="JSONL run logs to summarize")
+    make_dataset = subparsers.add_parser(
+        "make-dataset", help="Convert run logs into teacher-labelled Laya fine-tuning rows"
+    )
+    make_dataset.add_argument("logs", nargs="+", type=Path)
+    make_dataset.add_argument("--out", type=Path, default=Path("data\\mario-decisions.jsonl"))
+    make_dataset.add_argument("--frames-per-decision", type=int, default=8)
+    tune = subparsers.add_parser("finetune", help="Fine-tune Laya on a teacher-labelled dataset")
+    tune.add_argument("--data", type=Path, required=True)
+    tune.add_argument("--out", type=Path, default=Path("models\\mario-laya"))
+    tune.add_argument("--base", default="english", help="Laya checkpoint to start from")
+    tune.add_argument("--device", default="cuda")
+    tune.add_argument("--epochs", type=int, default=2)
+    tune.add_argument("--micro-batch", type=int, default=4)
+    tune.add_argument("--grad-accum", type=int, default=8)
+    tune.add_argument("--freeze-encoder", action="store_true")
     return parser
 
 
@@ -89,8 +125,40 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "state-demo":
         return state_demo()
+    if args.command == "summarize":
+        for log in args.logs:
+            print(format_summary(summarize_run(log)))
+        return 0
+    if args.command == "make-dataset":
+        count = write_dataset(
+            rows_from_logs(args.logs, args.frames_per_decision), args.out
+        )
+        print(f"Wrote {count} rows to {args.out.resolve()}")
+        return 0
+    if args.command == "finetune":
+        finetune_laya(
+            args.data,
+            args.out,
+            base=args.base,
+            device=args.device,
+            epochs=args.epochs,
+            micro_batch=args.micro_batch,
+            grad_accum=args.grad_accum,
+            freeze_encoder=args.freeze_encoder,
+        )
+        print(f"Fine-tuned checkpoint: {args.out.resolve()}")
+        return 0
     if args.command == "play":
-        policy = TypeSafePolicy() if args.policy == "typesafe" else HeuristicPolicy()
+        if args.policy == "laya":
+            policy = LayaPolicy(
+                model=args.model,
+                device=args.device,
+                frames_per_decision=args.frames_per_decision,
+            )
+        elif args.policy == "teacher":
+            policy = RuleTeacherPolicy(epsilon=args.teacher_epsilon, seed=args.seed)
+        else:
+            policy = HeuristicPolicy()
         log_path = run_episode(
             env_id=args.env,
             policy=policy,

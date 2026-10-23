@@ -102,7 +102,7 @@ def _run_realtime_dashboard(
     screenshot_saved = False
     terminated = truncated = False
 
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="typesafe-jev") as executor:
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="laya-policy") as executor:
         while True:
             decision_updated = False
             snapshot = parser.parse(
@@ -268,10 +268,15 @@ def run_episode(
 
                 decision = policy.choose(snapshot, actions)
                 action_index = ACTION_TO_INDEX[decision.action]
+                release_index = None
+                if decision.action in JUMP_ACTIONS and snapshot.grounded:
+                    # A new jump macro needs a button-up edge before A is pressed again.
+                    release_index = ACTION_TO_INDEX[JUMP_RELEASE_ACTION[decision.action]]
                 total_reward = 0.0
                 terminated = truncated = False
-                for _ in range(frames_per_decision):
-                    frame, reward, terminated, truncated, info = env.step(action_index)
+                for offset in range(frames_per_decision):
+                    step_index = release_index if offset == 0 and release_index is not None else action_index
+                    frame, reward, terminated, truncated, info = env.step(step_index)
                     total_reward += float(reward)
                     if terminated or truncated:
                         break
