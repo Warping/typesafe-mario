@@ -118,6 +118,12 @@ def build_parser() -> argparse.ArgumentParser:
     tune.add_argument("--micro-batch", type=int, default=4)
     tune.add_argument("--grad-accum", type=int, default=8)
     tune.add_argument("--freeze-encoder", action="store_true")
+    tune.add_argument(
+        "--log-every",
+        type=int,
+        default=10,
+        help="Print a loss line every N optimizer micro-steps",
+    )
     return parser
 
 
@@ -145,6 +151,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             micro_batch=args.micro_batch,
             grad_accum=args.grad_accum,
             freeze_encoder=args.freeze_encoder,
+            log_every=args.log_every,
         )
         print(f"Fine-tuned checkpoint: {args.out.resolve()}")
         return 0

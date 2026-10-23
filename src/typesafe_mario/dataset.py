@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,7 @@ def finetune_laya(
     micro_batch: int = 4,
     grad_accum: int = 8,
     freeze_encoder: bool = False,
+    log_every: int = 10,
 ) -> None:
     from laya.train import TrainConfig, finetune, resolve_checkpoint_dir
 
@@ -61,5 +63,8 @@ def finetune_laya(
         grad_accum=grad_accum,
         freeze_encoder=freeze_encoder,
         gradient_checkpointing=True,
+        log_every=log_every,
     )
+    print(f"[{datetime.now():%H:%M:%S}] starting fine-tune: base={base} data={data} out={output_dir}", flush=True)
     finetune(str(data), model_dir, str(output_dir), config=config, device=device)
+    print(f"[{datetime.now():%H:%M:%S}] fine-tune finished", flush=True)

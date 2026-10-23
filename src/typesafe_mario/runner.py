@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
@@ -254,6 +255,8 @@ def run_episode(
             previous_reward = 0.0
             previous_latency_ms = 0.0
             actions = tuple(Action)
+            started = time.perf_counter()
+            best_x = 0
             for decision_index in range(max_decisions):
                 snapshot = parser.parse(
                     info,
@@ -290,10 +293,13 @@ def run_episode(
                     terminated=terminated,
                     truncated=truncated,
                 )
+                best_x = max(best_x, snapshot.x)
                 print(
-                    f"#{decision_index:04d} x={snapshot.x:04d} "
+                    f"#{decision_index:04d} t={time.perf_counter() - started:7.1f}s "
+                    f"x={snapshot.x:04d} best={best_x:04d} "
                     f"action={decision.action.value:<15} "
-                    f"confidence={decision.confidence:.2f} latency={decision.latency_ms:.0f}ms"
+                    f"confidence={decision.confidence:.2f} latency={decision.latency_ms:.0f}ms",
+                    flush=True,
                 )
 
                 previous_action = decision.action
